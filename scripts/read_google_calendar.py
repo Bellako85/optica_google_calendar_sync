@@ -63,12 +63,22 @@ def main():
         for event in data.get("items", []):
             description = event.get("description") or ""
 
-            # Solo reservas creadas por el agente.
-            if (
-                "Customer phone:" not in description
-                or "Customer name:" not in description
+            
+            # Identificar reservas generadas por Meta Business Agent.
+            required_markers = (
+                "Business name:",
+                "Customer name:",
+                "Customer phone:",
+                "Chat with customer:",
+                "Booking notes:",
+            )
+
+            if not all(
+                marker in description
+                for marker in required_markers
             ):
                 continue
+
 
             if event.get("status") == "cancelled":
                 continue
