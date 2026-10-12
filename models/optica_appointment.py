@@ -1,7 +1,18 @@
 
 # -*- coding: utf-8 -*-
 
-from odoo import models
+import json
+import logging
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+import pytz
+
+from odoo import api, fields, models
+from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class OpticaAppointment(models.Model):
