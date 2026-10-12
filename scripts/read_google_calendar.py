@@ -4,6 +4,7 @@
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import requests
 from google.oauth2 import service_account
