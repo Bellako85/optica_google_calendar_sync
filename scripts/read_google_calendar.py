@@ -32,7 +32,7 @@ def main():
 
     url = (
         "https://www.googleapis.com/calendar/v3/calendars/"
-        f"{requests.utils.quote(CALENDAR_ID, safe='')}/events"
+        f"{quote(CALENDAR_ID, safe='')}/events"
     )
 
     events = []
