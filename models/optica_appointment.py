@@ -84,13 +84,56 @@ class OpticaAppointment(models.Model):
             elif key == "customer phone":
                 data["whatsapp"] = value
 
+            
             elif key == "booking notes":
                 data["reason"] = value
+
+            elif key in ("promotion", "promo"):
+                data["promotion"] = value
+
 
         
         # Buscar el correo del cliente entre los invitados.
         # Excluir el correo del calendario del negocio.
-        business_email = "hhvida@gmail.com"
+        excluded_emails = {
+            "hhvida@gmail.com",
+            "odoo-appointment@gtm-pd63jjjm-ztczy.iam.gserviceaccount.com",
+        }
+
+        customer_emails = []
+
+        for attendee in event.get("attendees", []):
+            email = (attendee.get("email") or "").strip().lower()
+
+            if (
+                email
+                and "@" in email
+                and email not in excluded_emails
+                and not attendee.get("self", False)
+                and not attendee.get("organizer", False)
+            ):
+                customer_emails.append(email)
+
+        # Solo aceptar el correo cuando hay un único candidato.
+        customer_emails = list(set(customer_emails))
+
+        if len(customer_emails) == 1:
+            data["email"] = customer_emails[0]
+```
+
+**Importante, mai:** reemplaza también el `for attendee` anterior completo, hasta su `break`. No dejes los dos ciclos, porque uno podría sobrescribir el resultado del otro.
+
+Con esta protección:
+
+- Si hay un único correo candidato, lo usamos.
+- Si no hay ninguno, no inventamos un correo.
+- Si hay varios correos distintos, no adivinamos cuál es el paciente.
+
+La reserva sin correo identificable se omitirá y quedará una advertencia en el log. Más adelante podemos preparar una forma de revisarla manualmente.
+
+**Todavía no hagas `git pull` ni reinicies Odoo.**
+
+Guarda con **Commit changes** y dime **«listo»**, mai. Después revisaremos el filtro que distingue las reservas del agente de los demás eventos del calendario. 💪
 
         for attendee in event.get("attendees", []):
             email = (attendee.get("email") or "").strip().lower()
@@ -158,9 +201,23 @@ class OpticaAppointment(models.Model):
         if duration <= 0:
             return False
 
+        
+        if (
+            local_start.second
+            or local_start.microsecond
+            or local_start.date()
+            != end_dt.astimezone(local_tz).date()
+        ):
+            _logger.warning(
+                "Google Calendar: evento %s con horario no compatible",
+                event_id,
+            )
+            return False
+
         appointment_time = (
             local_start.hour + local_start.minute / 60.0
         )
+
 
         values = {
             "patient_name": data["patient_name"],
