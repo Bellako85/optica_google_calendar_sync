@@ -134,7 +134,7 @@ class OpticaAppointment(models.Model):
 
         data = self._google_extract_customer_data(event)
 
-        required = ("patient_name", "whatsapp", "email")
+        required = ("patient_name", "whatsapp")
         missing = [key for key in required if not data.get(key)]
 
         if missing:
