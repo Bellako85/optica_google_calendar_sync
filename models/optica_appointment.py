@@ -125,6 +125,14 @@ class OpticaAppointment(models.Model):
         if not event_id:
             return False
 
+        description = event.get("description") or ""
+
+        if not any(
+            line.strip().lower().startswith("customer phone:")
+            for line in description.splitlines()
+        ):
+            return False
+
         existing = self.search([
             ("google_event_id", "=", event_id),
         ], limit=1)
@@ -194,7 +202,7 @@ class OpticaAppointment(models.Model):
             "patient_name": data["patient_name"],
             "whatsapp": data["whatsapp"],
             "phone": data["whatsapp"],
-            "email": data["email"],
+            "email": data.get("email") or False,
             "appointment_date": local_start.date(),
             "appointment_time": appointment_time,
             "duration": duration,
