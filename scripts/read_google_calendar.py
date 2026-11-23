@@ -80,31 +80,35 @@ def main():
             description = event.get("description") or ""
 
             
+            
             # Identificar reservas generadas por Meta Business Agent.
+            # Customer name ya no es obligatorio porque algunas
+            # reservas nuevas incluyen el nombre en Booking notes.
             required_markers = (
                 "Business name:",
-                "Customer name:",
                 "Customer phone:",
                 "Chat with customer:",
                 "Booking notes:",
             )
 
             if not all(
-                marker in description
+                marker.lower() in description.lower()
                 for marker in required_markers
             ):
                 continue
 
-
+            # Ignorar eventos cancelados.
             if event.get("status") == "cancelled":
                 continue
 
+            # Ignorar eventos sin fecha y hora válidas.
             if not event.get("start", {}).get("dateTime"):
                 continue
 
             if not event.get("end", {}).get("dateTime"):
                 continue
 
+            # Agregar evento válido.
             events.append(event)
 
         page_token = data.get("nextPageToken")
