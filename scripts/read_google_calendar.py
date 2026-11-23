@@ -61,6 +61,21 @@ def main():
 
         data = response.json()
 
+        print(
+            "DEBUG: Eventos recibidos directamente de Google:",
+            len(data.get("items", [])),
+            file=sys.stderr,
+        )
+
+        for event in data.get("items", []):
+            print(
+                "DEBUG:",
+                event.get("id"),
+                event.get("summary"),
+                event.get("start"),
+                file=sys.stderr,
+            )
+
         for event in data.get("items", []):
             description = event.get("description") or ""
 
