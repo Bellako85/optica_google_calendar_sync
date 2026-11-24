@@ -212,6 +212,10 @@ class OpticaAppointment(models.Model):
                 if email not in excluded_emails:
                     data["email"] = email
 
+        # Permitir reservas sin nombre, pero con telefono.
+        if not data.get("patient_name") and data.get("whatsapp"):
+            data["patient_name"] = "Paciente por identificar"
+
         return data
 
 
