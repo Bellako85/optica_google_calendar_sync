@@ -55,9 +55,12 @@ class OpticaAppointment(models.Model):
 
     
     
+    
     @api.model
     def _google_extract_customer_data(self, event):
         """Extrae los datos del paciente de una reserva de Meta."""
+        import re
+
         description = event.get("description") or ""
         data = {}
 
@@ -106,6 +109,66 @@ class OpticaAppointment(models.Model):
 
         if len(customer_emails) == 1:
             data["email"] = customer_emails[0]
+
+        # Recuperar las notas completas de la reserva.
+        notes_match = re.search(
+            r"Booking notes:\s*(.+)",
+            description,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        if notes_match:
+            data["reason"] = notes_match.group(1).strip()
+
+        notes = data.get("reason") or ""
+
+        # Recuperar el nombre si falta Customer name.
+        if not data.get("patient_name"):
+
+            # Formatos con Paciente: o Cliente:
+            match = re.search(
+                r"(?:Paciente|Cliente)\s*:\s*(.+?)"
+                r"(?=\s+-\s+|\n|$)",
+                notes,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+
+            # Formato: Examen visual - Nombre - Location:
+            if not match:
+                match = re.search(
+                    r"Examen visual\s*-\s*([^:\n]+?)"
+                    r"\s*-\s*Location:",
+                    notes,
+                    flags=re.IGNORECASE,
+                )
+
+            if match:
+                candidate = " ".join(match.group(1).split())
+
+                # Evitar guardar promociones como nombres.
+                if re.fullmatch(
+                    r"[^\W\d_]+(?:[ '\-][^\W\d_]+)+",
+                    candidate,
+                ) and not re.search(
+                    r"\b(promoci[oó]n|lentes|pares|examen|consulta|descuento)\b",
+                    candidate,
+                    flags=re.IGNORECASE,
+                ):
+                    data["patient_name"] = candidate
+
+        # Recuperar correo desde las notas si falta.
+        if not data.get("email"):
+            email_match = re.search(
+                r"Email\s*:\s*([\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})",
+                notes,
+                flags=re.IGNORECASE,
+            )
+
+            if email_match:
+                email = email_match.group(1).strip().lower()
+
+                if email not in excluded_emails:
+                    data["email"] = email
 
         return data
 
