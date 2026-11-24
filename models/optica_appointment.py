@@ -131,7 +131,7 @@ class OpticaAppointment(models.Model):
             value = value.strip(" ,.;")
 
             if not re.fullmatch(
-                r"[^\W\d_]+(?:[ '\-][^\W\d_]+)+",
+                r"[^\W\d_]+(?:[ '\-][^\W\d_]+)*",
                 value,
             ):
                 return False
