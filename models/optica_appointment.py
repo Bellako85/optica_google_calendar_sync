@@ -56,6 +56,7 @@ class OpticaAppointment(models.Model):
     
     
     
+    
     @api.model
     def _google_extract_customer_data(self, event):
         """Extrae los datos del paciente de una reserva de Meta."""
@@ -110,7 +111,7 @@ class OpticaAppointment(models.Model):
         if len(customer_emails) == 1:
             data["email"] = customer_emails[0]
 
-        # Recuperar las notas completas de la reserva.
+        # Recuperar las notas completas.
         notes_match = re.search(
             r"Booking notes:\s*(.+)",
             description,
@@ -122,45 +123,86 @@ class OpticaAppointment(models.Model):
 
         notes = data.get("reason") or ""
 
-        # Recuperar el nombre si falta Customer name.
+        # Normalizar espacios y saltos de linea.
+        normalized = " ".join(notes.split())
+
+        # Validar posibles nombres de pacientes.
+        def valid_name(value):
+            value = value.strip(" ,.;")
+
+            if not re.fullmatch(
+                r"[^\W\d_]+(?:[ '\-][^\W\d_]+)+",
+                value,
+            ):
+                return False
+
+            if re.search(
+                r"\b(promoci[oó]n|promo|lentes|pares|"
+                r"examen|consulta|descuento|location|"
+                r"ubicaci[oó]n|persona|cargo|"
+                r"monofocales|bifocales|progresivos|"
+                r"precio|pesos|horario|correo|"
+                r"tel[eé]fono|cliente|paciente)\b",
+                value,
+                flags=re.IGNORECASE,
+            ):
+                return False
+
+            return True
+
+        # Recuperar nombre cuando falta Customer name.
         if not data.get("patient_name"):
 
-            # Formatos con Paciente: o Cliente:
+            # Prioridad 1: etiquetas explicitas.
             match = re.search(
-                r"(?:Paciente|Cliente)\s*:\s*(.+?)"
-                r"(?=\s+-\s+|\n|$)",
-                notes,
-                flags=re.IGNORECASE | re.DOTALL,
+                r"\b(?:Paciente|Cliente|Nombre)\s*:\s*"
+                r"(.+?)(?=\s+[-–—]\s+|,|$)",
+                normalized,
+                flags=re.IGNORECASE,
             )
 
-            # Formato: Examen visual - Nombre - Location:
-            if not match:
-                match = re.search(
-                    r"Examen visual\s*-\s*([^:\n]+?)"
-                    r"\s*-\s*Location:",
-                    notes,
-                    flags=re.IGNORECASE,
-                )
-
             if match:
-                candidate = " ".join(match.group(1).split())
+                candidate = match.group(1).strip()
 
-                # Evitar guardar promociones como nombres.
-                if re.fullmatch(
-                    r"[^\W\d_]+(?:[ '\-][^\W\d_]+)+",
-                    candidate,
-                ) and not re.search(
-                    r"\b(promoci[oó]n|lentes|pares|examen|consulta|descuento)\b",
-                    candidate,
-                    flags=re.IGNORECASE,
-                ):
+                if valid_name(candidate):
                     data["patient_name"] = candidate
 
-        # Recuperar correo desde las notas si falta.
+            # Prioridad 2: nombre en las notas.
+            if not data.get("patient_name"):
+
+                parts = re.split(
+                    r"\s+[-–—]\s+",
+                    normalized,
+                )
+
+                candidates = []
+
+                for part in parts:
+                    candidate = part.strip()
+
+                    # Eliminar edad despues del nombre.
+                    candidate = re.sub(
+                        r",\s*\d+\s*años\b.*$",
+                        "",
+                        candidate,
+                        flags=re.IGNORECASE,
+                    ).strip()
+
+                    if valid_name(candidate):
+                        candidates.append(candidate)
+
+                candidates = list(dict.fromkeys(candidates))
+
+                # Evitar elegir nombres ambiguos.
+                if len(candidates) == 1:
+                    data["patient_name"] = candidates[0]
+
+        # Recuperar correo desde las notas.
         if not data.get("email"):
             email_match = re.search(
-                r"Email\s*:\s*([\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})",
-                notes,
+                r"(?:Email|Correo)\s*:\s*"
+                r"([\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})",
+                normalized,
                 flags=re.IGNORECASE,
             )
 
@@ -171,6 +213,7 @@ class OpticaAppointment(models.Model):
                     data["email"] = email
 
         return data
+
 
     
     @api.model
